@@ -47,6 +47,7 @@ namespace Projectis {
             this->textBox1->Name = L"textBox1";
             this->textBox1->Size = System::Drawing::Size(131, 20);
             this->textBox1->TabIndex = 1;
+            this->textBox1->TextChanged += gcnew System::EventHandler(this, &AddUserForm::textBox1_TextChanged);
             // 
             // okButton
             // 
@@ -85,5 +86,7 @@ namespace Projectis {
             this->DialogResult = System::Windows::Forms::DialogResult::OK;
             this->Close();
         }
+    private: System::Void textBox1_TextChanged(System::Object^ sender, System::EventArgs^ e) {
+    }
     };
 }
