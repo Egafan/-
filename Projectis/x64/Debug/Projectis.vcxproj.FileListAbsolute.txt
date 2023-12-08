@@ -1,0 +1,4 @@
+C:\Users\сергей\Desktop\--main\Projectis\x64\Debug\Projectis.vcxproj.AssemblyReference.cache
+C:\Users\сергей\Desktop\--main\Projectis\x64\Debug\Projectis.AddUserForm.resources
+C:\Users\сергей\Desktop\--main\Projectis\x64\Debug\Projectis.MyForm.resources
+C:\Users\сергей\Desktop\--main\Projectis\x64\Debug\Projectis.vcxproj.GenerateResource.cache
