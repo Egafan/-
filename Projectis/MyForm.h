@@ -23,8 +23,8 @@ namespace Projectis {
 			listBox1->SelectedIndexChanged += gcnew System::EventHandler(this, &MyForm::OnConferenceSelected);
 			OnConferenceSelected(nullptr, nullptr);
 			// Инициализация словаря 
+			checkboxStateDictionary = gcnew Dictionary<String^, Dictionary<String^, bool>^>();
 			conferenceDictionary = gcnew Dictionary<String^, List<String^>^>();
-		
 
 			String^ connectionString = "Data Source=RIFA\\SQLEXPRESSRIFA;Initial Catalog=Konfirik;Integrated Security=True";
 
@@ -83,7 +83,7 @@ namespace Projectis {
 		System::Windows::Forms::Button^ addButton;
 		System::Windows::Forms::Button^ deleteButton;
 		System::ComponentModel::Container^ components;
-
+		Dictionary<String^, Dictionary<String^, bool>^>^ checkboxStateDictionary;
 		Dictionary<String^, List<String^>^>^ conferenceDictionary;
 
 		void InitializeComponent(void) {
@@ -94,12 +94,16 @@ namespace Projectis {
 			this->deleteButton = (gcnew System::Windows::Forms::Button());
 			this->SuspendLayout();
 
+			// Инициализация checkboxStateDictionary
+			checkboxStateDictionary = gcnew Dictionary<String^, Dictionary<String^, bool>^>();
+
 			// listBox1
 			this->listBox1->FormattingEnabled = true;
 			this->listBox1->Location = System::Drawing::Point(12, 44);
 			this->listBox1->Name = L"listBox1";
-			this->listBox1->Size = System::Drawing::Size(148, 433);
+			this->listBox1->Size = System::Drawing::Size(165, 433);
 			this->listBox1->TabIndex = 0;
+			this->listBox1->SelectedIndexChanged += gcnew System::EventHandler(this, &MyForm::OnConferenceSelected);
 
 			// label1
 			this->label1->AutoSize = true;
@@ -123,6 +127,8 @@ namespace Projectis {
 			this->listView2->TabIndex = 2;
 			this->listView2->View = System::Windows::Forms::View::Details;
 			this->listView2->Click += gcnew System::EventHandler(this, &MyForm::listView2_Click);
+			// Подписка на событие ItemChecked
+			this->listView2->ItemChecked += gcnew ItemCheckedEventHandler(this, &MyForm::OnItemChecked);
 
 			// addButton
 			this->addButton->Location = System::Drawing::Point(191, 484);
@@ -158,59 +164,103 @@ namespace Projectis {
 			this->PerformLayout();
 		}
 
+		void OnItemChecked(System::Object^ sender, ItemCheckedEventArgs^ e) {
+			String^ conference = e->Item->SubItems[2]->Text;
+			String^ username = e->Item->SubItems[3]->Text;
+
+			if (!checkboxStateDictionary->ContainsKey(conference)) {
+				checkboxStateDictionary[conference] = gcnew Dictionary<String^, bool>();
+			}
+
+			if (!checkboxStateDictionary[conference]->ContainsKey(username)) {
+				checkboxStateDictionary[conference]->Add(username, e->Item->Checked);
+			}
+		}
+
 		void OnConferenceSelected(System::Object^ sender, System::EventArgs^ e) {
 			if (listBox1->SelectedItem != nullptr) {
 				String^ selectedConference = listBox1->SelectedItem->ToString();
 
 				// Clear existing items in listView2
-				listView2->Items->Clear(); {
-					// Извлеките пользователей для выбранной конференции и добавьте их в listView2 
-					if (conferenceDictionary->ContainsKey(selectedConference)) {
-						List<String^>^ users = conferenceDictionary[selectedConference];
-						for each (String ^ username in users) {
-							ListViewItem^ item = gcnew ListViewItem(DateTime::Now.ToString("dd-MM-yyyy"));
-							item->SubItems->Add(DateTime::Now.ToString("HH:mm"));
-							item->SubItems->Add(selectedConference);
-							item->SubItems->Add(username);
-							item->Checked = false;
-							listView2->Items->Add(item);
-						}
-					}
+				listView2->Items->Clear();
+
+				Dictionary<String^, bool>^ userCheckboxStates = gcnew Dictionary<String^, bool>();
+				if (checkboxStateDictionary->ContainsKey(selectedConference)) {
+					userCheckboxStates = checkboxStateDictionary[selectedConference];
 				}
 
-				// Fetch users for the selected conference and add them to listView2
+				// Извлекаем пользователей для выбранной конференции и добавляем их в listView2
 				String^ connectionString = "Data Source=RIFA\\SQLEXPRESSRIFA;Initial Catalog=Konfirik;Integrated Security=True";
 				SqlConnection^ connection = gcnew SqlConnection(connectionString);
 
-				try
-				{
+				try {
 					connection->Open();
-					String^ query = "SELECT nameuser FROM users WHERE conference = @conference";
-					SqlCommand^ cmd = gcnew SqlCommand(query, connection);
-					cmd->Parameters->AddWithValue("@conference", selectedConference);
-					SqlDataReader^ rdr = cmd->ExecuteReader();
 
-					while (rdr->Read())
-					{
-						String^ username = rdr->GetString(0);
+					// Проверим существование конференции в таблице Konfir
+					String^ checkConferenceQuery = "SELECT COUNT(*) FROM Konfir WHERE namekonf = @conference";
+					SqlCommand^ checkConferenceCmd = gcnew SqlCommand(checkConferenceQuery, connection);
+					checkConferenceCmd->Parameters->Add("@conference", System::Data::SqlDbType::VarChar, 255)->Value = selectedConference;
+					int conferenceCount = safe_cast<int>(checkConferenceCmd->ExecuteScalar());
 
-						ListViewItem^ item = gcnew ListViewItem(DateTime::Now.ToString("dd-MM-yyyy"));
-						item->SubItems->Add(DateTime::Now.ToString("HH:mm"));
-						item->SubItems->Add(selectedConference);
-						item->SubItems->Add(username);
-						item->Checked = false;
-						listView2->Items->Add(item);
+					if (conferenceCount == 0) {
+						MessageBox::Show("Выбранной конференции не существует в таблице Konfir.");
+						return;
 					}
 
-					rdr->Close();
+					// Продолжение выполнения запроса для Users
+					String^ query = "SELECT nameuser FROM Users WHERE conference = @conference";
+					SqlCommand^ cmd = gcnew SqlCommand(query, connection);
+					cmd->Parameters->Add("@conference", System::Data::SqlDbType::VarChar, 255)->Value = selectedConference;
+					SqlDataReader^ rdr = cmd->ExecuteReader();
+
+					// Проверка на наличие данных перед началом цикла чтения
+					if (rdr->HasRows) {
+						while (rdr->Read()) {
+							String^ username = rdr->GetFieldValue<String^>(0);
+
+							// Если есть сохраненное состояние галочки, устанавливаем его
+							if (userCheckboxStates->ContainsKey(username)) {
+								ListViewItem^ item = gcnew ListViewItem(DateTime::Now.ToString("dd-MM-yyyy"));
+								item->SubItems->Add(DateTime::Now.ToString("HH:mm"));
+								item->SubItems->Add(selectedConference);
+								item->SubItems->Add(username);
+								item->Checked = userCheckboxStates[username];
+
+								// Добавляем пользователя в ListView только если его там еще нет
+								if (!listView2->Items->Contains(item)) {
+									listView2->Items->Add(item);
+								}
+							}
+							else {
+								// Если пользователя нет в listView2, то добавляем его
+								bool userExists = false;
+								for each (ListViewItem ^ item in listView2->Items) {
+									if (item->SubItems[3]->Text == username) {
+										userExists = true;
+										break;
+									}
+								}
+
+								// Добавляем пользователя в ListView только если его там еще нет
+								if (!userExists) {
+									ListViewItem^ item = gcnew ListViewItem(DateTime::Now.ToString("dd-MM-yyyy"));
+									item->SubItems->Add(DateTime::Now.ToString("HH:mm"));
+									item->SubItems->Add(selectedConference);
+									item->SubItems->Add(username);
+									item->Checked = false;
+									listView2->Items->Add(item);
+								}
+							}
+						}
+					}
 				}
-				catch (Exception^ ex)
-				{
-					MessageBox::Show(ex->Message);
+				catch (Exception^ ex) {
+					MessageBox::Show("Ошибка при выполнении запроса: " + ex->Message);
 				}
-				finally
-				{
-					connection->Close();
+				finally {
+					if (connection->State == System::Data::ConnectionState::Open) {
+						connection->Close();
+					}
 				}
 			}
 		}
@@ -224,14 +274,53 @@ namespace Projectis {
 			if (listBox1->SelectedItem != nullptr) {
 				String^ selectedConference = listBox1->SelectedItem->ToString();
 
-				// Сохраняем пользователя в словаре 
-				if (!conferenceDictionary->ContainsKey(selectedConference)) {
-					conferenceDictionary[selectedConference] = gcnew List<String^>();
+				// Добавление пользователя в базу данных
+				String^ connectionString = "Data Source=RIFA\\SQLEXPRESSRIFA;Initial Catalog=Konfirik;Integrated Security=True";
+				SqlConnection^ connection = gcnew SqlConnection(connectionString);
+
+				try {
+					connection->Open();
+
+					// Проверим существование конференции в таблице Konfir
+					String^ checkConferenceQuery = "SELECT COUNT(*) FROM Konfir WHERE namekonf = @conference";
+					SqlCommand^ checkConferenceCmd = gcnew SqlCommand(checkConferenceQuery, connection);
+					checkConferenceCmd->Parameters->Add("@conference", System::Data::SqlDbType::VarChar, 255)->Value = selectedConference;
+					int conferenceCount = safe_cast<int>(checkConferenceCmd->ExecuteScalar());
+
+					if (conferenceCount == 0) {
+						MessageBox::Show("Выбранной конференции не существует в базе данных.");
+						return;
+					}
+
+					// Проверяем, не существует ли уже такого пользователя в конференции
+					String^ checkUserQuery = "SELECT COUNT(*) FROM Users WHERE nameuser = @username AND conference = @conference";
+					SqlCommand^ checkUserCmd = gcnew SqlCommand(checkUserQuery, connection);
+					checkUserCmd->Parameters->Add("@username", System::Data::SqlDbType::VarChar, 255)->Value = username;
+					checkUserCmd->Parameters->Add("@conference", System::Data::SqlDbType::VarChar, 255)->Value = selectedConference;
+					int userCount = safe_cast<int>(checkUserCmd->ExecuteScalar());
+
+					if (userCount > 0) {
+						MessageBox::Show("Пользователь " + username + " уже добавлен в конференцию.");
+						return;
+					}
+
+					// Добавление нового пользователя
+					String^ insertUserQuery = "INSERT INTO Users (nameuser, conference) VALUES (@username, @conference)";
+					SqlCommand^ insertUserCmd = gcnew SqlCommand(insertUserQuery, connection);
+					insertUserCmd->Parameters->Add("@username", System::Data::SqlDbType::VarChar, 255)->Value = username;
+					insertUserCmd->Parameters->Add("@conference", System::Data::SqlDbType::VarChar, 255)->Value = selectedConference;
+					insertUserCmd->ExecuteNonQuery();
+				}
+				catch (Exception^ ex) {
+					MessageBox::Show("Ошибка при добавлении пользователя в базу данных: " + ex->Message);
+				}
+				finally {
+					if (connection->State == System::Data::ConnectionState::Open) {
+						connection->Close();
+					}
 				}
 
-				conferenceDictionary[selectedConference]->Add(username);
-
-				// Обновляем ListView 
+				// Добавление пользователя в список и обновление ListView
 				ListViewItem^ item = gcnew ListViewItem(DateTime::Now.ToString("dd-MM-yyyy"));
 				item->SubItems->Add(DateTime::Now.ToString("HH:mm"));
 				item->SubItems->Add(selectedConference);
@@ -244,7 +333,43 @@ namespace Projectis {
 
 	private: System::Void deleteButton_Click(System::Object^ sender, System::EventArgs^ e) {
 		if (listView2->SelectedItems->Count > 0) {
-			listView2->Items->RemoveAt(listView2->SelectedItems[0]->Index);
+			// Получаем выделенный элемент
+			ListViewItem^ selectedItem = listView2->SelectedItems[0];
+
+			// Получаем информацию о конференции и пользователе
+			String^ selectedConference = selectedItem->SubItems[2]->Text;
+			String^ username = selectedItem->SubItems[3]->Text;
+
+			// Удаляем пользователя из базы данных
+			String^ connectionString = "Data Source=RIFA\\SQLEXPRESSRIFA;Initial Catalog=Konfirik;Integrated Security=True";
+			SqlConnection^ connection = gcnew SqlConnection(connectionString);
+
+			try {
+				connection->Open();
+
+				// Удаление пользователя из базы данных
+				String^ deleteUserQuery = "DELETE FROM Users WHERE nameuser = @username AND conference = @conference";
+				SqlCommand^ deleteUserCmd = gcnew SqlCommand(deleteUserQuery, connection);
+				deleteUserCmd->Parameters->Add("@username", System::Data::SqlDbType::VarChar, 255)->Value = username;
+				deleteUserCmd->Parameters->Add("@conference", System::Data::SqlDbType::VarChar, 255)->Value = selectedConference;
+				deleteUserCmd->ExecuteNonQuery();
+			}
+			catch (Exception^ ex) {
+				MessageBox::Show("Ошибка при удалении пользователя из базы данных: " + ex->Message);
+			}
+			finally {
+				if (connection->State == System::Data::ConnectionState::Open) {
+					connection->Close();
+				}
+			}
+
+			// Удаляем пользователя из ListView
+			listView2->Items->RemoveAt(selectedItem->Index);
+
+			// Обновление состояния флажков на основе словаря
+			if (checkboxStateDictionary->ContainsKey(selectedConference) && checkboxStateDictionary[selectedConference]->ContainsKey(username)) {
+				checkboxStateDictionary[selectedConference]->Remove(username);
+			}
 		}
 	}
 
