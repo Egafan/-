@@ -10,6 +10,7 @@
 #include <sql.h>
 #include <sqlext.h>
 
+
 namespace Projectis {
 	using namespace System;
 	using namespace System::Windows::Forms;
@@ -22,6 +23,9 @@ namespace Projectis {
 			InitializeComponent();
 			listBox1->SelectedIndexChanged += gcnew System::EventHandler(this, &MyForm::OnConferenceSelected);
 			OnConferenceSelected(nullptr, nullptr);
+			this->FormBorderStyle = System::Windows::Forms::FormBorderStyle::FixedSingle;
+			this->MaximizeBox = false;
+
 			// Инициализация словаря 
 			checkboxStateDictionary = gcnew Dictionary<String^, Dictionary<String^, bool>^>();
 			conferenceDictionary = gcnew Dictionary<String^, List<String^>^>();
@@ -68,6 +72,8 @@ namespace Projectis {
 				connection->Close();
 			}
 		}
+
+
 
 	protected:
 		~MyForm() {
@@ -158,8 +164,8 @@ namespace Projectis {
 			this->Controls->Add(this->listView2);
 			this->Controls->Add(this->label1);
 			this->Controls->Add(this->listBox1);
-			this->Name = L"MyForm";
-			this->Text = L"MyForm";
+			this->Name = L"Информационная система для учёта посетителей конференций";
+			this->Text = L"Информационная система для учёта посетителей конференций";
 			this->ResumeLayout(false);
 			this->PerformLayout();
 		}
