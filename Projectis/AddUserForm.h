@@ -48,10 +48,7 @@ namespace Projectis {
             this->textBox1->Name = L"textBox1";
             this->textBox1->Size = System::Drawing::Size(213, 22);
             this->textBox1->TabIndex = 1;
-            this->textBox1->TextChanged += gcnew System::EventHandler(this, &AddUserForm::textBox1_TextChanged);
-            // 
-            // okButton
-            // 
+            this->textBox1->KeyPress += gcnew System::Windows::Forms::KeyPressEventHandler(this, &AddUserForm::textBox1_KeyPress); // Новая строка
             this->okButton->Enabled = false;
             this->okButton->Location = System::Drawing::Point(125, 81);
             this->okButton->Name = L"okButton";
@@ -92,6 +89,7 @@ namespace Projectis {
             this->DialogResult = System::Windows::Forms::DialogResult::OK;
             this->Close();
         }
+
     private: System::Void textBox1_TextChanged(System::Object^ sender, System::EventArgs^ e) {
         // Проверка, содержит ли текст цифры или пуст
         if (System::Text::RegularExpressions::Regex::IsMatch(textBox1->Text, "\\d") || String::IsNullOrWhiteSpace(textBox1->Text)) {
@@ -102,7 +100,17 @@ namespace Projectis {
             // Иначе включаем кнопку OK
             okButton->Enabled = true;
         }
+    }
 
+    private: System::Void textBox1_KeyPress(System::Object^ sender, System::Windows::Forms::KeyPressEventArgs^ e) {
+        // Проверка, является ли нажатая клавиша буквой или пробелом
+        if (!Char::IsLetter(e->KeyChar) && e->KeyChar != 8 && e->KeyChar != ' ') { // 8 - Backspace
+            // Если не буква, не пробел и не Backspace, отменить событие
+            e->Handled = true;
+        }
+
+        // Вызываем метод для проверки текста после нажатия клавиши
+        textBox1_TextChanged(sender, e);
     }
     };
 }
