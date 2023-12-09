@@ -169,12 +169,15 @@ namespace Projectis {
 			String^ username = e->Item->SubItems[3]->Text;
 
 			if (!checkboxStateDictionary->ContainsKey(conference)) {
-				checkboxStateDictionary[conference] = gcnew Dictionary<String^, bool>();
+				checkboxStateDictionary->Add(conference, gcnew Dictionary<String^, bool>());
 			}
 
-			if (!checkboxStateDictionary[conference]->ContainsKey(username)) {
-				checkboxStateDictionary[conference]->Add(username, e->Item->Checked);
+			// Явная проверка существования ключа
+			if (checkboxStateDictionary[conference]->ContainsKey(username)) {
+				checkboxStateDictionary[conference]->Remove(username); // Удаляем существующую запись
 			}
+
+			checkboxStateDictionary[conference]->Add(username, e->Item->Checked); // Добавляем новую запись
 		}
 
 		void OnConferenceSelected(System::Object^ sender, System::EventArgs^ e) {
@@ -225,31 +228,16 @@ namespace Projectis {
 								item->SubItems->Add(selectedConference);
 								item->SubItems->Add(username);
 								item->Checked = userCheckboxStates[username];
-
-								// Добавляем пользователя в ListView только если его там еще нет
-								if (!listView2->Items->Contains(item)) {
-									listView2->Items->Add(item);
-								}
+								listView2->Items->Add(item);
 							}
 							else {
 								// Если пользователя нет в listView2, то добавляем его
-								bool userExists = false;
-								for each (ListViewItem ^ item in listView2->Items) {
-									if (item->SubItems[3]->Text == username) {
-										userExists = true;
-										break;
-									}
-								}
-
-								// Добавляем пользователя в ListView только если его там еще нет
-								if (!userExists) {
-									ListViewItem^ item = gcnew ListViewItem(DateTime::Now.ToString("dd-MM-yyyy"));
-									item->SubItems->Add(DateTime::Now.ToString("HH:mm"));
-									item->SubItems->Add(selectedConference);
-									item->SubItems->Add(username);
-									item->Checked = false;
-									listView2->Items->Add(item);
-								}
+								ListViewItem^ item = gcnew ListViewItem(DateTime::Now.ToString("dd-MM-yyyy"));
+								item->SubItems->Add(DateTime::Now.ToString("HH:mm"));
+								item->SubItems->Add(selectedConference);
+								item->SubItems->Add(username);
+								item->Checked = false;
+								listView2->Items->Add(item);
 							}
 						}
 					}
